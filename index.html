@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sticker</title>
+<style>
+:root{--bg:#fff;--fg:#1f2937;--muted:#6b7280;--hover:#eef2ff;--line:#e5e7eb}
+@media (prefers-color-scheme:dark){:root{--bg:#15191e;--fg:#e5e7eb;--muted:#9ca3af;--hover:#2a2f3a;--line:#2a2f3a}}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:13px system-ui,sans-serif}
+header{position:sticky;top:0;background:var(--bg);padding:8px 10px 6px;border-bottom:1px solid var(--line);z-index:1}
+h2{margin:10px 10px 4px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:4px;padding:4px 8px 10px}
+button{all:unset;cursor:pointer;border-radius:8px;aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+button:hover,button:focus-visible{background:var(--hover)}
+img{max-width:90%;max-height:90%}
+#msg{color:var(--muted);font-size:12px}
+</style></head><body>
+<header><b>HJMood</b> <span id="msg">· bấm để gửi</span></header>
+<div id="recentWrap" hidden><h2>Dùng gần đây</h2><div class="grid" id="recent"></div></div>
+<h2>Tất cả</h2><div class="grid" id="all"></div>
+<script>
+(function(){
+  var qs=new URLSearchParams(location.search), widgetId=qs.get("widgetId"), parentOrigin="*", n=0, LIST=[];
+  try{ var pu=qs.get("parentUrl"); if(pu) parentOrigin=new URL(pu).origin; }catch(e){}
+  function post(m){ window.parent.postMessage(m, parentOrigin); }
+  window.addEventListener("message", function(ev){
+    var d=ev.data; if(!d||d.api!=="toWidget") return;
+    if(!widgetId) widgetId=d.widgetId;
+    var resp={};
+    if(d.action==="capabilities") resp={capabilities:["m.sticker"]};
+    else if(d.action==="supported_api_versions") resp={supported_versions:["0.0.1","0.0.2"]};
+    post(Object.assign({}, d, {response:resp}));
+  });
+  function recentGet(){ try{ return JSON.parse(localStorage.getItem("hj_recent")||"[]"); }catch(e){ return []; } }
+  function recentAdd(i){ try{ var r=recentGet().filter(function(x){return x!==i}); r.unshift(i); localStorage.setItem("hj_recent", JSON.stringify(r.slice(0,16))); }catch(e){} }
+  function send(i){
+    var s=LIST[i], info={w:s.w,h:s.h,size:s.size,mimetype:"image/png",thumbnail_url:s.mxc,thumbnail_info:{w:s.w,h:s.h,size:s.size,mimetype:"image/png"}};
+    post({api:"fromWidget", widgetId:widgetId, requestId:"hj-"+Date.now()+"-"+(n++), action:"m.sticker",
+          data:{name:"HJMood "+(i+1), description:"HJMood "+(i+1), content:{url:s.mxc, info:info}}});
+    recentAdd(i); renderRecent();
+  }
+  function btn(i){ var b=document.createElement("button"); b.title="HJMood "+(i+1);
+    var im=document.createElement("img"); im.loading="lazy"; im.alt=b.title; im.src="s/"+LIST[i].f; b.appendChild(im);
+    b.onclick=function(){ send(i); }; return b; }
+  function renderRecent(){ var r=recentGet(), box=document.getElementById("recent"); box.innerHTML="";
+    r.forEach(function(i){ if(LIST[i]) box.appendChild(btn(i)); });
+    document.getElementById("recentWrap").hidden=!r.length; }
+  fetch("stickers.json").then(function(r){return r.json()}).then(function(list){
+    LIST=list; var all=document.getElementById("all");
+    list.forEach(function(_,i){ all.appendChild(btn(i)); }); renderRecent();
+  }).catch(function(){ document.getElementById("msg").textContent="· không tải được danh sách"; });
+})();
+</script></body></html>
